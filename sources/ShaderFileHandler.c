@@ -2,7 +2,34 @@
 #include <stdlib.h>
 #include <string.h>
 
-char** ParseShader(char* _filePath)
+
+char* read_file(char* _filePath)
+{
+	FILE* fp = fopen(_filePath, "r");
+
+	if (fp == NULL)
+		return NULL;
+	int len = 0;
+	char c;
+	while (fread(&c, sizeof(char), 1, fp))
+		len++;
+
+	//fseek(fp, SEEK_SET, SEEK_END);
+
+
+	fseek(fp, SEEK_SET, SEEK_SET);
+
+	char* arr = (char*)malloc(sizeof(char) * (len + 1));
+	arr[len] = 0;
+
+	fread(arr, sizeof(char), len, fp);
+	fclose(fp);
+
+	return arr;
+}
+
+
+const char** ParseShader(char* _filePath)
 {
 	FILE* fp = fopen(_filePath, "r");
 	char **s = (char **)malloc(sizeof(char**));
@@ -66,7 +93,7 @@ char** ParseShader(char* _filePath)
 
 	s[1] = myfsh;
 
-	return s;
+	return (const char **)s;
 
 }
 
