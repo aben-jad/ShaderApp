@@ -271,6 +271,7 @@ int main(int argc, char** argv)
 	glDeleteShader(fragmentShader);
 	// Once finished with OpenGL functions, the SDL_GLContext can be destroyed.
 
+	bool focus_lost = false;
 	const float minDist = 2.0f;
 	const float maxDist = 18.0f;
 	const float rotation_speed = 3.0f;
@@ -321,12 +322,21 @@ int main(int argc, char** argv)
 
 	while (1)
 	{
+		SDL_Event event;
+		SDL_PollEvent(&event);
+
+		if (event.window.type == SDL_EVENT_WINDOW_FOCUS_LOST)
+			focus_lost = true;
+		if (event.window.type == SDL_EVENT_WINDOW_FOCUS_GAINED)
+			focus_lost = false;
+
+		if (focus_lost)
+			continue;
+
 		SDL_GetMouseState(&currentMousePos.x, &currentMousePos.y);
 		currentMousePos.x = 2.0f * currentMousePos.x / (float)winWidth - 1.0f; 
 		currentMousePos.y = 1.0f - 2.0f * currentMousePos.y / (float)winHeight;
 
-		SDL_Event event;
-		SDL_PollEvent(&event);
 		if (event.type == SDL_EVENT_QUIT)
 			break;
 
