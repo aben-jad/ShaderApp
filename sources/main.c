@@ -1,115 +1,18 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
-#include "myincludes.h"
 #include <glad/glad.h>
 #include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
+#include <mystructs.h>
+#include <mymath.h>
+#include <myglobals.h>
+#include <mymacros.h>
+#include <fileutils.h>
+#include <shaderutils.h>
+#include <configutils.h>
+#include <uiutils.h>
 
-#define uint unsigned int
-
-#define ADD(a, b) (vec3){ a.x + b.x, a.y + b.y , a.z + b.z }
-#define SCA(s, a) (vec3){ s * a.x, s * a.y , s * a.z }
-#define SIGN(s) (s < 0) ? -1.0f : 1.0f
-
-	const char *vertexShaderSource = "#version 330 core\n"
-	    "layout (location = 0) in vec4 pos;\n"
-	    "out vec2 uv;\n"
-	    "void main() {\n"
-	    "    gl_Position = pos;\n"
-	    "    uv = pos.xy;\n"
-	    "}";
-	
-	const char *fragmentShaderSourceDefault = "#version 330 core\n"
-	    "out vec4 FragColor;\n"
-	    "void main() {\n"
-	    "    FragColor = vec4(1.0, 0.0, 1.0, 1.0);\n"
-	    "}";
-
-typedef struct
-{
-	float x, y, z;
-} vec3;
-
-typedef struct
-{
-	float w, x, y, z;
-} quaternion;
-
-quaternion quaternion_multiplication(quaternion _a, quaternion _b)
-{
-	quaternion q;
-
-	///  (_a.w + _a.x * i + _a.y * j + _a.z * k) * (_b.w + _b.x * i + _b.y * j + _b.z * k)
-
-	///  _a.w * _b.w + _a.w * _b.x * i + _a.w * _b.y * j + _a.w * _b.z * k 
-	///  _a.x * i * _b.w + _a.x * i * _b.x * i + _a.x * i * _b.y * j + _a.x * i * _b.z * k = 
-	///  _a.y * j * _b.w + _a.y * j * _b.x * i + _a.y * j * _b.y * j + _a.y * j * _b.z * k
-	///  _a.z * k * _b.w + _a.z * k * _b.x * i + _a.z * k * _b.y * j + _a.z * k * _b.z * k
-
-
-	///  _a.w * _b.w + _a.w * _b.x * i + _a.w * _b.y * j + _a.w * _b.z * k 
-	///  _a.x * i * _b.w - _a.x * _b.x + _a.x  * _b.y * k - _a.x * i * _b.z * j 
-	///  _a.y * j * _b.w - _a.y * _b.x * k - _a.y * _b.y + _a.y * _b.z * i
-	///  _a.z * k * _b.w + _a.z *  _b.x * j - _a.z * _b.y * i - _a.z * _b.z
-
-	///  ( _a.w * _b.w      ,    _a.w * _b.x    ,    _a.w * _b.y     ,    _a.w * _b.z  )
-	///  ( -_a.x * _b.x     ,    _a.x * _b.w    ,    -_a.x * _b.z    ,     _a.x * _b.y )
-	///  ( -_a.y * _b.y     ,    _a.y * _b.z    ,    _a.y  * _b.w    ,    -_a.y * _b.x )
-	///  ( -_a.z * _b.z     ,    -_a.z * _b.y   ,    _a.z *  _b.x    ,    _a.z * _b.w  )
-
-	q.w = _a.w * _b.w - _a.x * _b.x - _a.y * _b.y - _a.z * _b.z;
-	q.x = _a.w * _b.x + _a.x * _b.w + _a.y * _b.z - _a.z * _b.y;
-	q.y = _a.w * _b.y - _a.x * _b.z + _a.y * _b.w + _a.z * _b.x;
-	q.z = _a.w * _b.z + _a.x * _b.y - _a.y * _b.x + _a.z * _b.w;
-
-	return q;
-}
-
-float dot(vec3 _a, vec3 _b)
-{
-	return _a.x * _b.x + _a.y * _b.y + _a.z * _b.z;
-}
-
-
-
-vec3 quaternion_rotation(vec3 _p, float _ang, vec3 _axis)
-{
-	float c = cos(_ang * 0.5f);
-	float s = sin(_ang * 0.5f);
-
-	quaternion p  = { 0, _p.x, _p.y, _p.z };
-	quaternion q  = { c, s * _axis.x, s * _axis.y, s * _axis.z };
-	quaternion qi = { c, -1 * s * _axis.x, -1 * s * _axis.y, -1 * s * _axis.z };
-
-	quaternion qp   = quaternion_multiplication(q, p);
-	quaternion qpqi = quaternion_multiplication(qp, qi);
-
-	vec3 res = { qpqi.x, qpqi.y, qpqi.z };
-
-	return res;
-}
-
-vec3 cross(vec3 _a, vec3 _b)
-{
-	float s1 = _a.y*_b.z - _a.z*_b.y;
-	float s2 = _a.z*_b.x - _b.z*_a.x;
-	float s3 = _a.x*_b.y - _b.x*_a.y;
-
-	vec3 res = {s1, s2, s3};
-
-	return res;
-}
-
-float dist(vec3 _a)
-{
-	return sqrt(dot(_a, _a));
-}
-
-vec3 normalize(vec3 _a)
-{
-	float lenght = dist(_a);
-	vec3 res = {_a.x / lenght, _a.y / lenght, _a.z / lenght};
-	return res;
-}
 
 vec3 zoom(vec3 _v, float _dm, float _min, float _max)
 {
@@ -123,70 +26,69 @@ vec3 zoom(vec3 _v, float _dm, float _min, float _max)
 	return res;
 }
 
-float compute_angle(vec3 _a, vec3 _b, vec3 _N)
+int mouse_on_viewport(vec3 _mousePos, rect _vp)
 {
-	float ab = dist(_a) * dist(_b);
-	//if (ab == 0.0f)
-	//	printf("0 err\n");
-	float c = dot(_a, _b) / ab;
-	if (c > 1.0f)
-		c = 1.0f;
-	else if (c < -1.0f)
-		c = -1.0f;
-		//printf("%f\n", c);
-	//float s = dist(cross(_a, _b)) / ab;
-	//vec3 N = {0.0f, 1.0f, 0.0f};
-	vec3 cr = cross(_a, _b);
-	float dt = dot(cr, _N);
-	float s = SIGN(dt);
-	//printf("%f\n", dt);
-	return acos(c) * s;
+	return (_mousePos.x > _vp.x && _mousePos.x < (_vp.x + _vp.w) && _mousePos.y > _vp.y && _mousePos.y < (_vp.y + _vp.h));
 }
 
-int reload_shader(char* _path)
+void pass_ui_uniforms(GLint* _uni)
 {
-	unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-	glCompileShader(vertexShader);
+	glUniform1f(_uni[g_ui_sliders.hovered], g_ui_sliders.current_value[g_ui_sliders.hovered]);
+}
 
-	unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	const char* fragmentShaderSource = read_file(_path);
-	glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-	glCompileShader(fragmentShader);
-	free(fragmentShaderSource);
+GLint* get_config_uniform_locations(GLuint _shaderId)
+{
+	int length = g_ui_sliders.len;
+	GLint* res = (GLint*)malloc(length * sizeof(GLint));
 
-	int res;
-	glGetShaderiv(fragmentShader,GL_COMPILE_STATUS, &res);
-
-	if (res == GL_FALSE)
+	for (int i = 0; i < length; i++)
 	{
-		glShaderSource(fragmentShader, 1, &fragmentShaderSourceDefault, NULL);
-		glCompileShader(fragmentShader);
+		res[i] = glGetUniformLocation(_shaderId, g_ui_sliders.name[i]);
+	}
+	return res;
+}
+
+char* get_ui_titles()
+{
+	int ui_len = g_ui_sliders.len;
+
+	int final_str_len = ui_len ;
+
+	int strs_len[ui_len];
+
+	for (int i = 0; i < ui_len; i++)
+	{
+		strs_len[i] = strlen(g_ui_sliders.name[i]);
+		final_str_len += strs_len[i];
 	}
 
+	char* res = (char*)malloc(final_str_len * sizeof(char));
+	int cur_index = 0;
+	for (int i = 0; i < ui_len; i++)
+	{
+		strncpy(res + cur_index, g_ui_sliders.name[i], strs_len[i]);
+		cur_index += strs_len[i];
+		res[cur_index++] = '\n';
+		//res[cur_index++] = '\n';
+	}
 
-	unsigned int shaderProgram = glCreateProgram();
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-	glLinkProgram(shaderProgram);
-	
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragmentShader);
-	return shaderProgram;
+	res[cur_index] = 0;
+	return res;
 }
-
 
 int main(int argc, char** argv)
 {
 	SDL_Init(SDL_INIT_VIDEO);
 
 
-	char *winName = "my win";
 	char* shaderPath = NULL;
 
-	int winWidth = 1000, winHeight = 1000;
+	int winNormalWidth = 1000, winHeight = 1000, winConfigWidth = 1500;
 
-	SDL_Window* win = SDL_CreateWindow(winName, winWidth, winHeight, SDL_WINDOW_OPENGL);
+	rect main_viewport = { 0, 0, winNormalWidth, winHeight};
+	rect ui_viewport = { winNormalWidth, 0, winConfigWidth-winNormalWidth, winHeight};
+
+	SDL_Window* win = SDL_CreateWindow("mywindow", winNormalWidth, winHeight, SDL_WINDOW_OPENGL);
 
 	if (win == NULL)
 	{
@@ -196,85 +98,157 @@ int main(int argc, char** argv)
 
 	SDL_GLContext glcontext = SDL_GL_CreateContext(win);
 	gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress);
-	
 
-	uint vao;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
+	//uint vao;
+	//glGenVertexArrays(1, &vao);
+	//glBindVertexArray(vao);
 
-	uint bufPosId;
-	glGenBuffers(1, &bufPosId);
-	glBindBuffer(GL_ARRAY_BUFFER, bufPosId);
+	float main_vertices2[] = { -1.0f, -1.0f, 0.0f, 0.0f, 
+			  -1.0f, 1.0f, 0.0, 1.0f,
+			  1.0f, 1.0f, 1.0f, 1.0f,
+			  1.0f, -1.0f, 1.0f, 0.0f };
 
-	float vertices[] = { -1.0f, -1.0f,
+	float main_vertices[] = { -1.0f, -1.0f,
 			  -1.0f, 1.0f,
-			  1.0f, 1.0f,
-			  1.0f, -1.0f };
-			  //1.0f, 1.0f,
-			  //1.0f, -1.0f };
-	glBufferData(GL_ARRAY_BUFFER, 8 * sizeof(float), vertices, GL_STATIC_DRAW);
+			  1.1f, 1.0f,
+			  1.1f, -1.0f };
+
+
+	float main_tex_uv[] = { -1.0f, -2.0f,
+			  -1.0f, 3.0f,
+			  2.0f, 3.0f,
+			  2.0f, -2.0f };
+
+
 
 	unsigned int indices[] = {
 	    0, 1, 2,  // First triangle
 	    0, 2, 3   // Second triangle
 	};
 
-	uint ebo;
-	glGenBuffers(1, &ebo);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+	uint main_buf_verts;
+	glGenBuffers(1, &main_buf_verts);
+	glBindBuffer(GL_ARRAY_BUFFER, main_buf_verts);
+	glBufferData(GL_ARRAY_BUFFER, 8 * sizeof(float), main_vertices, GL_STATIC_DRAW);
+
+	uint indices_buf;
+	glGenBuffers(1, &indices_buf);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices_buf);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(float), indices, GL_STATIC_DRAW);
 
-	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2,0);
+	glEnableVertexAttribArray(0);
 
-	unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-	glCompileShader(vertexShader);
-	// now you can make GL calls.
-	//
+	uint main_buf_uvs;
+	glGenBuffers(1, &main_buf_uvs);
+	glBindBuffer(GL_ARRAY_BUFFER, main_buf_uvs);
+	glBufferData(GL_ARRAY_BUFFER, 8 * sizeof(float), main_tex_uv, GL_STATIC_DRAW);
 
-	unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, (void*)(0 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+
+	//uint ui_buf_verts;
+	//glGenBuffers(1, &ui_buf_verts);
+	//glBindBuffer(GL_ARRAY_BUFFER, ui_buf_verts);
+	//glBufferData(GL_ARRAY_BUFFER, 8 * sizeof(float), ui_vertices, GL_STATIC_DRAW);
+
+
 	if (argc == 2)
 	{
-		shaderPath = argv[1];
-		const char* fragmentShaderSource = read_file(shaderPath);
-
-		glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-		glCompileShader(fragmentShader);
-		free(fragmentShaderSource);
-
-		int res;
-		glGetShaderiv(fragmentShader,GL_COMPILE_STATUS, &res);
-
-		if (res == GL_FALSE)
+		g_project_path = argv[1];
+		if (!shader_file_exist())
 		{
-			glShaderSource(fragmentShader, 1, &fragmentShaderSourceDefault, NULL);
-			glCompileShader(fragmentShader);
+			printf("shader file not found\n");
+			return 1;
+		}
+		if (!config_file_exist())
+		{
+			printf("config file not found\n");
+			return 1;
 		}
 	}
 
 	else
 	{
-		glShaderSource(fragmentShader, 1, &fragmentShaderSourceDefault, NULL);
-		glCompileShader(fragmentShader);
+		printf("enter exact args\n");
+		return 1;
 	}
 
 
 
 
-	GLuint shaderProgram = glCreateProgram();
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-	glLinkProgram(shaderProgram);
+
+	GLuint ui_shader_program = generate_ui_program();
+	glUseProgram(ui_shader_program);
+	init_ui();
+
+	GLuint main_shader_program = generate_main_program();
+	glUseProgram(main_shader_program);
+	GLint* config_1f_uniforms = get_config_uniform_locations(main_shader_program);
+
+
+
+
+	//drawing text
+
+	if (!TTF_Init())
+	{
+        	printf("Couldn't initialise SDL_ttf\n");
+        	return 1;
+	}
+
+	TTF_Font* font = TTF_OpenFont("C:/Windows/Fonts/arial.ttf", 1024);
 	
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragmentShader);
+	if (!(font))
+	{
+		printf("Failed to load font\n");
+		return 1;
+	}
+
+	SDL_Color text_color = {255, 255, 255, 255};
+	char* ui_text = get_ui_titles();
+	SDL_Surface *textSurface = TTF_RenderText_Blended_Wrapped(font, ui_text, 0, text_color, 0);
+	SDL_Surface* formatted = SDL_ConvertSurface(textSurface, SDL_PIXELFORMAT_RGBA32);
+	SDL_DestroySurface(textSurface);
+	textSurface = formatted;
+	SDL_FlipSurface(textSurface, SDL_FLIP_VERTICAL);
+	GLuint textTexture;
+	glGenTextures(1, &textTexture);
+	glBindTexture(GL_TEXTURE_2D, textTexture);
+	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textSurface->w, textSurface->h, 0,
+	             GL_RGBA, GL_UNSIGNED_BYTE, textSurface->pixels);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	//glBindTexture(GL_TEXTURE_2D, textTexture);
+	//glGenerateMipmap(GL_TEXTURE_2D);
+	glActiveTexture(GL_TEXTURE0);
+	GLint textute_location = glGetUniformLocation(main_shader_program, "u_text");
+	glUniform1i(textute_location, 0);
+
+	SDL_DestroySurface(textSurface);
+
+	//end
+	
+
+
+
 	// Once finished with OpenGL functions, the SDL_GLContext can be destroyed.
 
 	bool focus_lost = false;
+	bool config_shown = false;
+	bool ui_element_selected = false;
 	const float minDist = 2.0f;
 	const float maxDist = 18.0f;
-	const float rotation_speed = 3.0f;
+	const float rotation_speed = 2.0f;
+	const float small_rot = 0.05f;
 
 	const vec3 light1Pos = { 0.0f, 5.0f, 0.0f };
 	const vec3 light2Pos = { 4.0f, -5.0f, 4.0f };
@@ -289,18 +263,18 @@ int main(int argc, char** argv)
 	unsigned int timmer = 0;
 
 
-	GLint light1Location = glGetUniformLocation(shaderProgram, "u_light1Pos");
-	GLint light2Location = glGetUniformLocation(shaderProgram, "u_light2Pos");
-	GLint light3Location = glGetUniformLocation(shaderProgram, "u_light3Pos");
+	GLint light1Location = glGetUniformLocation(main_shader_program, "u_light1Pos");
+	GLint light2Location = glGetUniformLocation(main_shader_program, "u_light2Pos");
+	GLint light3Location = glGetUniformLocation(main_shader_program, "u_light3Pos");
 
-	GLint camLocation = glGetUniformLocation(shaderProgram, "u_camPos");
-	GLint screenLocation = glGetUniformLocation(shaderProgram, "u_screenPos");
+	GLint camLocation = glGetUniformLocation(main_shader_program, "u_camPos");
+	GLint screenLocation = glGetUniformLocation(main_shader_program, "u_screenPos");
 
-	GLint upLocation = glGetUniformLocation(shaderProgram, "u_up");
-	GLint rightLocation = glGetUniformLocation(shaderProgram, "u_right");
+	GLint upLocation = glGetUniformLocation(main_shader_program, "u_up");
+	GLint rightLocation = glGetUniformLocation(main_shader_program, "u_right");
 
-	glUseProgram(shaderProgram);
-	glBindVertexArray(vao);
+	glUseProgram(main_shader_program);
+	//glBindVertexArray(vao);
 
 	glUniform3f(camLocation, camPos.x, camPos.y, camPos.z);
 	glUniform3f(screenLocation, screenPos.x, screenPos.y, screenPos.z);
@@ -313,11 +287,15 @@ int main(int argc, char** argv)
 	glUniform3f(rightLocation, camRight.x, camRight.y, camRight.z);
 
 
-	vec3 currentMousePos = {0.0f, 0.0f, 0.0f};
-	SDL_GetMouseState(&currentMousePos.x, &currentMousePos.y);
-	currentMousePos.x = 2.0f * currentMousePos.x / (float)winWidth - 1.0f; 
-	currentMousePos.y = 1.0f - 2.0f * currentMousePos.y / (float)winHeight;
-	vec3 oldMousePos = currentMousePos;
+	vec3 currentRawMousePos = {0.0f, 0.0f, 0.0f};
+	vec3 currentMainMousePos = {0.0f, 0.0f, 0.0f};
+	vec3 currentUIMousePos = {0.0f, 0.0f, 0.0f};
+	SDL_GetMouseState(&currentRawMousePos.x, &currentRawMousePos.y);
+	currentMainMousePos.x = 2.0f * currentRawMousePos.x / (float)winNormalWidth - 1.0f; 
+	currentMainMousePos.y = 1.0f - 2.0f * currentRawMousePos.y / (float)winHeight;
+	vec3 oldRawMousePos = currentRawMousePos;
+	vec3 oldMainMousePos = currentMainMousePos;
+	//vec3 oldUIMousePos = currentUIMousePos;
 
 
 	while (1)
@@ -333,9 +311,18 @@ int main(int argc, char** argv)
 		if (focus_lost)
 			continue;
 
-		SDL_GetMouseState(&currentMousePos.x, &currentMousePos.y);
-		currentMousePos.x = 2.0f * currentMousePos.x / (float)winWidth - 1.0f; 
-		currentMousePos.y = 1.0f - 2.0f * currentMousePos.y / (float)winHeight;
+		if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_SPACE && SDL_GetKeyboardState(NULL)[SDL_SCANCODE_LCTRL] == true)
+		{
+			config_shown = !config_shown;
+			if (config_shown)
+				SDL_SetWindowSize(win, winConfigWidth, winHeight);
+			else
+				SDL_SetWindowSize(win, winNormalWidth, winHeight);
+		}
+
+		SDL_GetMouseState(&currentRawMousePos.x, &currentRawMousePos.y);
+		currentMainMousePos.x = 2.0f * currentRawMousePos.x / (float)winNormalWidth - 1.0f; 
+		currentMainMousePos.y = 1.0f - 2.0f * currentRawMousePos.y / (float)winHeight;
 
 		if (event.type == SDL_EVENT_QUIT)
 			break;
@@ -370,8 +357,8 @@ int main(int argc, char** argv)
 		}
 		else if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_S)
 		{
-			shaderProgram = reload_shader(shaderPath);
-			glUseProgram(shaderProgram);
+			main_shader_program = generate_main_program();
+			glUseProgram(main_shader_program);
 
 			glUniform3f(camLocation, camPos.x, camPos.y, camPos.z);
 			glUniform3f(screenLocation, screenPos.x, screenPos.y, screenPos.z);
@@ -388,9 +375,9 @@ int main(int argc, char** argv)
 			float newMouse_x, newMouse_y;
 			if (SDL_GetMouseState(NULL, NULL) == SDL_BUTTON_LEFT)
 			{
-				float dx = (-currentMousePos.x+oldMousePos.x) * rotation_speed;
-				float dy = (currentMousePos.y-oldMousePos.y) * rotation_speed;
-				
+				float dx = rotation_speed * (-currentMainMousePos.x+oldMainMousePos.x);
+				float dy = rotation_speed * (currentMainMousePos.y-oldMainMousePos.y);
+
 				camPos = quaternion_rotation(camPos, dx,camUp);
 				screenPos = quaternion_rotation(screenPos, dx,camUp);
 				camRight = quaternion_rotation(camRight, dx, camUp);
@@ -408,13 +395,37 @@ int main(int argc, char** argv)
 		}
 
 		glClear(GL_COLOR_BUFFER_BIT);
+		if (config_shown)
+		{
+			glViewport(ui_viewport.x, ui_viewport.y, ui_viewport.w, ui_viewport.h);
+			glUseProgram(ui_shader_program);
+			if (mouse_on_viewport(currentRawMousePos, ui_viewport))
+			{
+				currentUIMousePos.x = (currentRawMousePos.x - main_viewport.w)/ui_viewport.w - 0.5f;
+				currentUIMousePos.y = 1.0f - 2.0f * currentRawMousePos.y/ui_viewport.h;
+		 		if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == 1 && g_ui_sliders.hovered > -1)
+					ui_element_selected = true;
+		 		if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == 1)
+					ui_element_selected = false;
+				if (ui_element_selected)
+					manage_selected_ui(currentUIMousePos);
+				else
+					manage_hovered_ui(currentUIMousePos);
+			}
+
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
+			glViewport(main_viewport.x, main_viewport.y, main_viewport.w, main_viewport.h);
+			glUseProgram(main_shader_program);
+			if (ui_element_selected)
+				pass_ui_uniforms(config_1f_uniforms);
+		}
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
 		SDL_GL_SwapWindow(win);
 
 		timmer = SDL_GetTicks() % 10;
 
 		if (timmer == 0)
-			oldMousePos = currentMousePos;
+			oldMainMousePos = currentMainMousePos;
 
 	}
 	SDL_GL_DestroyContext(glcontext);  
