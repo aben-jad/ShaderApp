@@ -12,8 +12,8 @@ arg = $(proj2)
 
 
 TEST:
-	gcc $(inc) -o $(tar) $(src2) $(loc) $(lib)
+	clang $(inc) -o $(tar) $(src2) $(loc) $(lib)
 ALL:
-	gcc $(inc) -o $(tar) $(src) $(loc) $(lib)
+	clang $(inc) -o $(tar) $(src) $(loc) $(lib)
 RUN:
 	$(tar) $(arg)
